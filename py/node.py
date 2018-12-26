@@ -66,32 +66,32 @@ class Node:
                 nullable = True
         return nullable
 
-    def get_first_post(self, positions: dict, position: int) -> list:
-        result = None
+    def get_first_post(self, positions: dict, position: int) -> set:
+        result = set()
         if self.value not in specials and self.value != 'E':
-            result = [positions[position]]
+            result.add(positions[position])
         else:
             if self.value == '|':
-                result = self.left.first_pos + self.right.first_pos
+                result = self.left.first_pos.union(self.right.first_pos)
             elif self.value == '.':
                 result = copy(self.left.first_pos)
                 if self.left.nullable:
-                    result += self.right.first_pos
+                    result = result.union(self.right.first_pos)
             elif self.value == '*':
                 result = copy(self.right.first_pos)
         return result
 
-    def get_last_post(self, positions: dict, position: int) -> list:
-        result = None
+    def get_last_post(self, positions: dict, position: int) -> set:
+        result = set()
         if self.value not in specials and self.value != 'E':
-            result = [positions[position]]
+            result.add(positions[position])
         else:
             if self.value == '|':
-                result = self.left.last_pos + self.right.last_pos
+                result = self.left.last_pos.union(self.right.last_pos)
             elif self.value == '.':
                 result = copy(self.right.last_pos)
                 if self.right.nullable:
-                    result += self.left.last_pos
+                    result = result.union(self.left.last_pos)
             elif self.value == '*':
                 result = copy(self.right.last_pos)
         return result
