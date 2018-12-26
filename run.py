@@ -1,11 +1,14 @@
+from py.fsm import FiniteStateMachine
 from py.parser import RegexParser
+from py.tree import Tree
 
 
 def main() -> None:
-    # Input and validation
-    temp = '(a|a*|a|a).c.#'
+    # TODO Input from KB
+    temp = '(a|b*)|(a|c).#'
     parser = RegexParser(temp)
-    fsm = parser.fsm
+    tree = Tree(parser)
+    fsm = FiniteStateMachine(tree.root, parser.symbols_indices, tree.follow_pos)
     print(fsm.restore_re())
     pass
 

@@ -11,12 +11,22 @@ class Node:
     first_pos = None
     last_pos = None
 
-    def __init__(self, regex: str, positions: dict, shift=0):
-        if regex[0] == '(' and regex[-1] == ')':
-            regex = regex[1:-1]
-            shift += 1
+    """
+    Узер дерева РВ
+    Shift - сдвиг относительно реальной позиции в исходном РВ
+    (эквивалентен реальной позиции первого символа входной строки в исходном РВ)
+    """
 
-        position = shift
+    def __init__(self, regex: str, positions: dict, shift=0):
+        # Отбрасываем скобки. Корректируем сдвиг символа
+        regex, shift = self.fix_brackets(regex, shift)
+        #if regex[0] == '(' and regex[-1] == ')':
+        #    regex = regex[1:-1]
+        #    shift += 1
+
+        # Позиция символа текущего листа в исходном РВ
+        real_pos = shift
+        # Для конечных листов специальная обработка
         if len(regex) == 1:
             if regex in specials:
                 raise Exception('Special symbol cannot be an endpoint!')
@@ -24,23 +34,33 @@ class Node:
             self.left = None
             self.right = None
         else:
-            split = self.find_current_position(regex)
-            position += split
-            self.value = regex[split]
+            # Находим позицию для разделения
+            current_pos = self.find_current_position(regex)
+            # Корректируем реальную позицию
+            real_pos += current_pos
+            self.value = regex[current_pos]
+            # У * только правый ребенок!
+            # Учитываем необходимый сдвиг при создании правых/левых детей для текущего узла
             if self.value == '*':
-                self.right = Node(regex[:split], positions, shift)
+                self.right = Node(regex[:current_pos], positions, shift)
             else:
-                self.left = Node(regex[:split], positions, shift)
-                self.right = Node(regex[split+1:], positions, shift+split+1)
+                self.left = Node(regex[:current_pos], positions, shift)
+                self.right = Node(regex[current_pos + 1:], positions, shift + current_pos + 1)
         self.nullable = self.get_nullable()
-        self.first_pos = self.get_first_post(positions, position)
-        self.last_pos = self.get_last_post(positions, position)
+        self.first_pos = self.get_first_post(positions, real_pos)
+        self.last_pos = self.get_last_post(positions, real_pos)
+
+    """
+    Получение необходимой позиции для разделения
+    (Эквивалентно позиции символа текущего узла)
+    """
 
     @staticmethod
     def find_current_position(regex: str) -> int:
         level = 0
         result = 0
         priority = 5
+        # Пропускаем скобки и ищем высший приоритет (самый правый при одинаковых)
         for index, symbol in enumerate(regex):
             if symbol == '(':
                 level += 1
@@ -48,10 +68,15 @@ class Node:
             if symbol == ')':
                 level -= 1
                 continue
+            # Делим только по спецсимволам
             if symbol in specials and level == 0 and priorities[symbol] <= priority:
                 result = index
                 priority = priorities[symbol]
         return result
+
+    """
+    Проверяем может ли результат подвыражения быть равен пустой строке
+    """
 
     def get_nullable(self) -> bool:
         nullable = None
@@ -66,8 +91,13 @@ class Node:
                 nullable = True
         return nullable
 
+    """
+    Находим первую позицию (псевдо-позиция!)
+    """
+
     def get_first_post(self, positions: dict, position: int) -> set:
         result = set()
+        # У эпсилона не заполняем
         if self.value not in specials and self.value != 'E':
             result.add(positions[position])
         else:
@@ -81,8 +111,13 @@ class Node:
                 result = copy(self.right.first_pos)
         return result
 
+    """
+    Находим последнюю позицию (псевдо-позиция!)
+    """
+
     def get_last_post(self, positions: dict, position: int) -> set:
         result = set()
+        # У эпсилона не заполняем
         if self.value not in specials and self.value != 'E':
             result.add(positions[position])
         else:
@@ -95,3 +130,20 @@ class Node:
             elif self.value == '*':
                 result = copy(self.right.last_pos)
         return result
+
+    @staticmethod
+    def fix_brackets(regex: str, shift: int) -> (str, int):
+        if regex[0] != '(' or regex[-1] != ')':
+            return regex, shift
+        counter = 0
+        for i in regex[:-1]:
+            if i == '(':
+                counter += 1
+            elif i == ')':
+                counter -= 1
+                if counter == 0:
+                    return regex, shift
+        if counter == 1:
+            return regex[1:-1], shift + 1
+        else:
+            return regex, shift
