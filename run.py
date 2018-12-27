@@ -15,7 +15,10 @@ def main() -> None:
         return
     tree = Tree(parser)
     fsm = FiniteStateMachine(tree.root, parser.symbols_indices, tree.follow_pos)
-    print(fsm.restore_re())
+    try:
+        print(fsm.restore_re())
+    except:
+        print('Unavailable type of conversion!')
 
 
 if __name__ == '__main__':
