@@ -131,7 +131,7 @@ class FiniteStateMachine:
     Восстановление РВ из ДКА
     """
 
-    def restore_re(self) -> set:
+    def restore_re(self) -> str:
         # Последовательно удаляем состояния не явл. конечными и начальным
         while True:
             state = self.find_deletable_state()
@@ -211,13 +211,13 @@ class FiniteStateMachine:
                                               '|'.join(sorted([safe_wrap(i.by) for i in similar])),
                                               similar[0].to_state))
 
-    def finalize_re(self, state=0) -> set:
-        result = set()
+    def finalize_re(self, state=0) -> str:
+        result = ''
         cycle, starts, ends = self.split_transitions(self.transitions, state)
         if cycle is not None:
             same_sym = [starts.index(x) for x in starts if x.by == cycle.by]
             if len(same_sym) == 0:
-                result.add('{}*'.format(safe_wrap(cycle.by)))
+                result += '{}*'.format(safe_wrap(cycle.by))
             else:
                 for item in same_sym:
                     starts[item].by = safe_wrap(starts[item].by) + '*'
@@ -228,23 +228,26 @@ class FiniteStateMachine:
             for item in ends:
                 item_sub = self.finalize_re(item.to_state)
                 if item_sub != '':
-                    compound = compound.union(item_sub)
+                    compound.add(item_sub)
                 compound.add(item.by)
                 # Если переходим от финального узла необходим эпсилон
             if state in self.end and not self.have_top_level_multi(copy(compound)):
                 compound.add('E')
-            result = result.union(compound)
+            result += self.connect_compound(compound)
         return result
 
-    def get_re(self):
-        compound = self.restore_re()
+    @staticmethod
+    def connect_compound(compound: set) -> str:
+        split = set()
         to_remove = []
         for item in compound:
-            if len(compound.intersection([item+'*'])) != 0:
+            split = split.union(FiniteStateMachine.split_by_top_or(item))
+        for item in split:
+            if len(split.intersection([item+'*'])) != 0 or len(split.intersection(['(' + item + ')' + '*'])) != 0:
                 to_remove.append(item)
         for item in to_remove:
-            compound.remove(item)
-        return '|'.join(compound)
+            split.remove(item)
+        return '|'.join(sorted(split))
 
     @staticmethod
     def have_top_level_multi(compound: set):
@@ -271,7 +274,7 @@ class FiniteStateMachine:
         return cycle, starts, ends
 
     @staticmethod
-    def cut_brackets(compound) -> set:
+    def cut_brackets(compound: set) -> set:
         result = set()
         for item in compound:
             left = item.find('(')
@@ -288,6 +291,21 @@ class FiniteStateMachine:
                 left = item.find('(')
             result.add(item)
         return result
+
+    @staticmethod
+    def split_by_top_or(item: str) -> list:
+        level = 0
+        points = [-1]
+        for index, sym in enumerate(item):
+            if sym == '(':
+                level += 1
+            elif sym == ')':
+                level -= 1
+            elif sym == '|' and level == 0:
+                points.append(index)
+        if len(points) == 1:
+            return [item]
+        return [item[i+1:j] for i, j in zip(points, points[1:]+[None])]
 
 
 def safe_wrap(inp: str) -> str:
