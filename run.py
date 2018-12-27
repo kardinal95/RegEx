@@ -6,9 +6,13 @@ from py.validator import Validator
 
 def main() -> None:
     # TODO Input from KB
-    temp = '(aa(c|(ab*c)))|(bcb*c)'
+    temp = input('Regex: ')
     validator = Validator(temp)
-    parser = RegexParser(validator.validation())
+    try:
+        parser = RegexParser(validator.validation())
+    except ValueError:
+        print('Incorrent input')
+        return
     tree = Tree(parser)
     fsm = FiniteStateMachine(tree.root, parser.symbols_indices, tree.follow_pos)
     print(fsm.restore_re())

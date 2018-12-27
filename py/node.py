@@ -20,9 +20,6 @@ class Node:
     def __init__(self, regex: str, positions: dict, shift=0):
         # Отбрасываем скобки. Корректируем сдвиг символа
         regex, shift = self.fix_brackets(regex, shift)
-        #if regex[0] == '(' and regex[-1] == ')':
-        #    regex = regex[1:-1]
-        #    shift += 1
 
         # Позиция символа текущего листа в исходном РВ
         real_pos = shift
@@ -144,6 +141,6 @@ class Node:
                 if counter == 0:
                     return regex, shift
         if counter == 1:
-            return regex[1:-1], shift + 1
+            return Node.fix_brackets(regex[1:-1], shift + 1)
         else:
             return regex, shift
