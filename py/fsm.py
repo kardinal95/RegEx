@@ -234,8 +234,10 @@ class FiniteStateMachine:
                 if len(connections) != 0:
                     index = ends.index(connections[0])
                     ends[index].by = ''
-                    if cycle is not None and cycle.by in symbols:
-                        cycle = None
+                    if cycle is not None:
+                        cycle_sym = self.split_by_top_or(cycle.by)
+                        if len(set(cycle_sym) & set(symbols)) != 0:
+                            cycle = None
 
         # Если есть куда идти дальше
         if len(ends) > 0:
