@@ -16,8 +16,8 @@ def main() -> None:
     tree = Tree(parser)
     fsm = FiniteStateMachine(tree.root, parser.symbols_indices, tree.follow_pos)
     try:
-        print(fsm.restore_re())
-    except:
+        print(fsm.get_re())
+    except RecursionError:
         print('Unavailable type of conversion!')
 
 

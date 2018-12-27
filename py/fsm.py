@@ -1,3 +1,4 @@
+from copy import copy
 from queue import Queue
 
 from py.node import Node
@@ -130,7 +131,7 @@ class FiniteStateMachine:
     Восстановление РВ из ДКА
     """
 
-    def restore_re(self) -> str:
+    def restore_re(self) -> set:
         # Последовательно удаляем состояния не явл. конечными и начальным
         while True:
             state = self.find_deletable_state()
@@ -207,28 +208,49 @@ class FiniteStateMachine:
                     transitions.remove(item)
 
                 transitions.append(Transition(similar[0].from_state,
-                                              '|'.join([safe_wrap(i.by) for i in similar]),
+                                              '|'.join(sorted([safe_wrap(i.by) for i in similar])),
                                               similar[0].to_state))
 
-    def finalize_re(self, state=0) -> str:
-        result = ''
+    def finalize_re(self, state=0) -> set:
+        result = set()
         cycle, starts, ends = self.split_transitions(self.transitions, state)
         if cycle is not None:
-            result += '{}*'.format(safe_wrap(cycle.by))
+            same_sym = [starts.index(x) for x in starts if x.by == cycle.by]
+            if len(same_sym) == 0:
+                result.add('{}*'.format(safe_wrap(cycle.by)))
+            else:
+                for item in same_sym:
+                    starts[item].by = safe_wrap(starts[item].by) + '*'
         # Если есть куда идти дальше
         if len(ends) > 0:
-            sub = ''
-            # Если переходим от финального узла необходим эпсилон
-            if state in self.end:
-                sub += 'E'
+            compound = set()
             # Добавляем следующий уровень идя дальше по переходам
             for item in ends:
-                if state in self.end:
-                    sub += '|'
-                sub += item.by
-                sub += self.finalize_re(item.to_state)
-            result += safe_wrap(sub)
+                item_sub = self.finalize_re(item.to_state)
+                if item_sub != '':
+                    compound = compound.union(item_sub)
+                compound.add(item.by)
+                # Если переходим от финального узла необходим эпсилон
+            if state in self.end and not self.have_top_level_multi(copy(compound)):
+                compound.add('E')
+            result = result.union(compound)
         return result
+
+    def get_re(self):
+        compound = self.restore_re()
+        to_remove = []
+        for item in compound:
+            if len(compound.intersection([item+'*'])) != 0:
+                to_remove.append(item)
+        for item in to_remove:
+            compound.remove(item)
+        return '|'.join(compound)
+
+    @staticmethod
+    def have_top_level_multi(compound: set):
+        compound = FiniteStateMachine.cut_brackets(compound)
+        multi = [x for x in compound if x == '*' or (len(x) == 2 and x[-1] == '*')]
+        return len(multi) != 0
 
     @staticmethod
     def split_transitions(transitions: list, state: int) -> (list, list, list):
@@ -247,6 +269,25 @@ class FiniteStateMachine:
                 ends.append(item)
                 continue
         return cycle, starts, ends
+
+    @staticmethod
+    def cut_brackets(compound) -> set:
+        result = set()
+        for item in compound:
+            left = item.find('(')
+            while left != -1:
+                level = 0
+                for index, sym in enumerate(item):
+                    if sym == '(':
+                        level += 1
+                    elif sym == ')':
+                        level -= 1
+                        if level == 0:
+                            item = item[:left] + item[index+1:]
+                            break
+                left = item.find('(')
+            result.add(item)
+        return result
 
 
 def safe_wrap(inp: str) -> str:
