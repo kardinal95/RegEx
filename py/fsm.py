@@ -1,3 +1,4 @@
+from os.path import commonprefix
 from copy import copy
 from queue import Queue
 
@@ -99,9 +100,16 @@ class FiniteStateMachine:
         return None
 
     def in_same_class(self, state1: int, state2: int) -> bool:
-        state_1_transitions = [(x.by, x.to_state) for x in self.transitions if x.from_state == state1]
-        state_2_transitions = [(x.by, x.to_state) for x in self.transitions if x.from_state == state2]
-        return state_1_transitions == state_2_transitions
+        state_1_transitions = [(x.by, x.to_state) for x in self.transitions if x.from_state == state1
+                               and x.to_state not in [state1, state2]]
+        state_2_transitions = [(x.by, x.to_state) for x in self.transitions if x.from_state == state2
+                               and x.to_state not in [state1, state2]]
+        letter_cycle_1 = [x.by for x in self.transitions if x.from_state == state1 and x.to_state == state1]
+        letter_cycle_2 = [x.by for x in self.transitions if x.from_state == state2 and x.to_state == state2]
+        letter_1_2 = [x.by for x in self.transitions if x.from_state == state1 and x.to_state == state2]
+        letter_2_1 = [x.by for x in self.transitions if x.from_state == state2 and x.to_state == state1]
+        return state_1_transitions == state_2_transitions\
+               and set(letter_cycle_1 + letter_1_2) == set(letter_cycle_2 + letter_2_1)
 
     """
     Сокращает класс эквивалентности
@@ -150,10 +158,25 @@ class FiniteStateMachine:
         # Удаляем Е если есть * на верхнем уровне
         if 'E' in paths and FiniteStateMachine.have_top_level_multi(paths):
             paths.remove('E')
-        # Исключаем граничные состояния
-        # Для этого делим на значимые куски
-        # parts = self.split_for_parts(paths)
-        return '|'.join(paths)
+        # Сокращение одинаковых чстей
+        result = ''
+        prefix = commonprefix(list(paths))
+        if prefix == '' or len(paths) == 1:
+            return '|'.join(paths)
+        else:
+            amount = 0
+            while prefix != '' and len(paths) > 1:
+                amount += 1
+                result += prefix + '('
+                paths = set([x.replace(prefix, '', 1) for x in paths])
+                if '' in paths:
+                    paths.remove('')
+                    if not FiniteStateMachine.have_top_level_multi(paths):
+                        paths.add('E')
+                prefix = commonprefix(list(paths))
+            result += '|'.join(paths)
+            result += ')' * amount
+        return result
 
     def find_deletable_state(self) -> int:
         available = [x for x in self.states.keys() if x not in self.end and x != self.start]
@@ -245,7 +268,7 @@ class FiniteStateMachine:
             for item in ends:
                 sub = list(self.finalize_re(item.to_state))
                 if len(sub) != 0:
-                    first = ['{}{}'.format(item.by, x) for x in sub if x != 'E']
+                    first = ['{}{}'.format(safe_wrap(item.by), safe_wrap(x)) for x in sub if x != 'E']
                     second = None
                     if 'E' in sub:
                         first.append(safe_wrap(item.by))
