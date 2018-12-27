@@ -9,6 +9,7 @@ class Tree:
     """
     Создает дерево из текущего обработанного регулярного выражения в парсере
     """
+
     def __init__(self, parser: RegexParser) -> None:
         self.root = Node(parser.regex, parser.true_indices)
         self.init_follow_pos(parser.true_indices)
@@ -16,6 +17,7 @@ class Tree:
     """
     Создаем таблицу с позициями следующих элементов перехода
     """
+
     def init_follow_pos(self, true_indices: dict) -> None:
         self.follow_pos = dict()
         # Нам нужны все псевдо позиции
@@ -27,6 +29,7 @@ class Tree:
     """
     Перебираем дерево и заполняем позиции элементов перехода по алгоритму
     """
+
     def add_follow(self, node, follow_pos) -> None:
         # На пустых выходим
         if node is None:

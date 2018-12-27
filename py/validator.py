@@ -38,9 +38,8 @@ class Validator:
         result = self.regex
 
         while i < len(result) - 1:
-            if result[i] not in left_operands and result[i+1] not in right_operands:
+            if result[i] not in left_operands and result[i + 1] not in right_operands:
                 result = result[:i + 1] + '.' + result[i + 1:]
                 i += 1
             i += 1
         return '({}).#'.format(result)
-
