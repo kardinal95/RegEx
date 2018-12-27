@@ -142,7 +142,18 @@ class FiniteStateMachine:
         # Сокращаем оставшиеся
         self.shorten_similar(self.transitions)
         # Разбираемся с начальным и конечными состояниями
-        return self.finalize_re()
+        paths = self.finalize_re()
+        # Вносим корректировки для сокращения оставшихся кусков
+        # Удаляем пустой путь
+        if '' in paths:
+            paths.remove('')
+        # Удаляем Е если есть * на верхнем уровне
+        if 'E' in paths and FiniteStateMachine.have_top_level_multi(paths):
+            paths.remove('E')
+        # Исключаем граничные состояния
+        # Для этого делим на значимые куски
+        # parts = self.split_for_parts(paths)
+        return '|'.join(paths)
 
     def find_deletable_state(self) -> int:
         available = [x for x in self.states.keys() if x not in self.end and x != self.start]
@@ -211,43 +222,44 @@ class FiniteStateMachine:
                                               '|'.join(sorted([safe_wrap(i.by) for i in similar])),
                                               similar[0].to_state))
 
-    def finalize_re(self, state=0) -> str:
-        result = ''
+    def finalize_re(self, state=0) -> set:
+        result = set()
         cycle, starts, ends = self.split_transitions(self.transitions, state)
-        if cycle is not None:
-            same_sym = [starts.index(x) for x in starts if x.by == cycle.by]
-            if len(same_sym) == 0:
-                result += '{}*'.format(safe_wrap(cycle.by))
-            else:
-                for item in same_sym:
-                    starts[item].by = safe_wrap(starts[item].by) + '*'
+        # Сокращение путей перекрестных циклам
+        for target in set([x.to_state for x in ends]):
+            cycle_t, starts_t, ends_t = self.split_transitions(self.transitions, target)
+            if cycle_t is not None:
+                symbols = self.split_by_top_or(cycle_t.by)
+                connections = [x for x in starts_t if x in ends and x.by in symbols]
+                if len(connections) != 0:
+                    index = ends.index(connections[0])
+                    ends[index].by = ''
+                    if cycle is not None and cycle.by in symbols:
+                        cycle = None
+
         # Если есть куда идти дальше
         if len(ends) > 0:
-            compound = set()
             # Добавляем следующий уровень идя дальше по переходам
             for item in ends:
-                item_sub = self.finalize_re(item.to_state)
-                if item_sub != '':
-                    compound.add(item_sub)
-                compound.add(item.by)
-                # Если переходим от финального узла необходим эпсилон
-            if state in self.end and not self.have_top_level_multi(copy(compound)):
-                compound.add('E')
-            result += self.connect_compound(compound)
+                sub = list(self.finalize_re(item.to_state))
+                if len(sub) != 0:
+                    first = ['{}{}'.format(item.by, x) for x in sub if x != 'E']
+                    second = None
+                    if 'E' in sub:
+                        first.append(safe_wrap(item.by))
+                    if cycle is not None:
+                        second = ['{}*{}'.format(safe_wrap(cycle.by), x) for x in first if x != 'E']
+                        if 'E' in sub:
+                            second.append('{}*{}'.format(safe_wrap(cycle.by), safe_wrap(item.by)))
+                        # first += second
+                    result = result.union(second if second is not None else first)
+        # Если переходим от финального узла необходим эпсилон
+        if state in self.end:
+            result.add('E')
+            # Для случаев с одним узлом!
+            if cycle is not None:
+                result.add('{}*'.format(safe_wrap(cycle.by)))
         return result
-
-    @staticmethod
-    def connect_compound(compound: set) -> str:
-        split = set()
-        to_remove = []
-        for item in compound:
-            split = split.union(FiniteStateMachine.split_by_top_or(item))
-        for item in split:
-            if len(split.intersection([item+'*'])) != 0 or len(split.intersection(['(' + item + ')' + '*'])) != 0:
-                to_remove.append(item)
-        for item in to_remove:
-            split.remove(item)
-        return '|'.join(sorted(split))
 
     @staticmethod
     def have_top_level_multi(compound: set):
@@ -286,7 +298,7 @@ class FiniteStateMachine:
                     elif sym == ')':
                         level -= 1
                         if level == 0:
-                            item = item[:left] + item[index+1:]
+                            item = item[:left] + item[index + 1:]
                             break
                 left = item.find('(')
             result.add(item)
@@ -305,10 +317,32 @@ class FiniteStateMachine:
                 points.append(index)
         if len(points) == 1:
             return [item]
-        return [item[i+1:j] for i, j in zip(points, points[1:]+[None])]
+        return [item[i + 1:j] for i, j in zip(points, points[1:] + [None])]
+
+    """
+    @staticmethod
+    def split_for_parts(paths: set) -> set:
+        result = set()
+        # Сначала разрежем по верхним *
+        for path in paths:
+            level = 0
+            last = 0
+            for index, symbol in enumerate(path):
+                if symbol == '(':
+                    level += 1
+                elif symbol == ')':
+                    level -= 1
+                elif symbol == '*' and index + 1 < len(path) and path[index + 1] != ')':
+                    result.add(path[last:index + 1])
+                    last = index + 1
+            result.add(path[last:])
+        return result
+    """
 
 
 def safe_wrap(inp: str) -> str:
+    if len(inp) == 0:
+        return inp
     if inp[0] == '(' and inp[-1] == ')':
         return inp
     if len(inp) == 1:
