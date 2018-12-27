@@ -42,5 +42,5 @@ class Validator:
                 result = result[:i + 1] + '.' + result[i + 1:]
                 i += 1
             i += 1
-        return result
+        return '({}).#'.format(result)
 

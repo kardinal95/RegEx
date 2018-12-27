@@ -144,11 +144,12 @@ class FiniteStateMachine:
         return self.finalize_re()
 
     def find_deletable_state(self) -> int:
-        for state in self.states.keys():
-            if state == self.start or state in self.end:
-                continue
-            return state
-        return -1
+        available = [x for x in self.states.keys() if x not in self.end and x != self.start]
+        if len(available) == 0:
+            return -1
+        filtered = [x for x in self.transitions if x.from_state != x.to_state]
+        available.sort(key=lambda x: len([y for y in filtered if y.from_state == x or y.to_state == x]))
+        return available[0]
 
     """
     Удаляем состояние с обьединением частей перехода в РВ
