@@ -92,6 +92,10 @@ class FiniteStateMachine:
             for secondary in self.states:
                 if item == secondary:
                     continue
+                if item == self.start and item not in self.end:
+                    continue
+                if secondary == self.start and secondary not in self.end:
+                    continue
                 if self.in_same_class(item, secondary):
                     state_class.append(secondary)
             # Работаем с классами содержащими хотя бы 2 элемента
