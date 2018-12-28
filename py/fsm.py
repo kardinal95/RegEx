@@ -255,7 +255,7 @@ class FiniteStateMachine:
         # Сокращение путей перекрестных циклам
         for target in set([x.to_state for x in ends]):
             cycle_t, starts_t, ends_t = self.split_transitions(self.transitions, target)
-            if cycle_t is not None:
+            if cycle_t is not None and state in self.end:
                 symbols = self.split_by_top_or(cycle_t.by)
                 connections = [x for x in starts_t if x in ends and x.by in symbols]
                 if len(connections) != 0:
